@@ -16,7 +16,7 @@ contract Marketplace {
 		uint id;
 		string name;
 		uint price;
-		address owner;
+		address payable owner;
 		bool purchased;
 	}
 
@@ -24,7 +24,15 @@ contract Marketplace {
 		uint id,
 		string name,
 		uint price,
-		address owner,
+		address payable owner,
+		bool purchased
+	);
+
+		event ProductPurchased(
+		uint id,
+		string name,
+		uint price,
+		address payable owner,
 		bool purchased
 	);
 
@@ -51,14 +59,24 @@ contract Marketplace {
 		emit ProductCreated(productCount, _name, _price, msg.sender, false);
 	}
 
-	function purchaseProduct(uint _id) public{
+	function purchaseProduct(uint _id) public payable{        // payable keyword is used by solidity to determine that this function can be allowed to send Ether
 		// fetch the product
 		Product memory _product = products[_id];  // instantiate a new product in memory(i.e creating copy of product already in the block chain linked with the product mapping)
 
 		// fetch the owner
-		address _seller = _product.owner;
+		address payable _seller = _product.owner;
 
-		// Make sure the product is valid
+		// Make sure the product is valid, i.e it has a valid ID
+		require(_product.id > 0 && _product.id <= productCount);
+
+		// Validate there is enough Ether for the transaction
+		require(msg.value >= _product.price);
+
+		// Validate that the product has not been previously purchased
+		require(!_product.purchased);
+
+		// Validate that the buyer is not the seller 
+		require(_seller != msg.sender);
 
 		// Transfer ownership to the buyer (msg.sender is the person who call this function)
 		_product.owner = msg.sender;
@@ -66,12 +84,14 @@ contract Marketplace {
 		// Purchase It
 		_product.purchased = true;
 
-		// Update the product in blockchain (with new values of product as implemented in this function)
+		// Update the product in mapping (with new values of product as implemented in this function)
 		products[_id] = _product;
 
 		// pay the seller by sending them Ether
+		address(_seller).transfer(msg.value); 
 
 		// Trigger an event
+		emit ProductPurchased(productCount, _product.name, _product.price, msg.sender, true);
 
 	}
 }
